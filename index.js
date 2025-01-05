@@ -210,8 +210,8 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-// Bot Status Management
-const statusMessages = ["🎧 Listening to Spotify", "🎮 Playing Minecraft", "📱 Chatting on Discord"];
+// Custom Status Management
+const statusMessages = ["🎧 Listening to Spotify", "🎮 Playing GTA VI", "📱Watching YouTube"];
 const statusTypes = ['dnd', 'idle', 'online'];
 let currentStatusIndex = 0;
 let currentTypeIndex = 0;
@@ -223,7 +223,7 @@ function updateStatus() {
     activities: [{ name: currentStatus, type: ActivityType.Custom }],
     status: currentType,
   });
-  console.log('[ STATUS ] updated status to:', '${currentStatus} (${currentType})');
+  console.log('[ STATUS ] Updated status to:', `${currentStatus} (${currentType})`);
   currentStatusIndex = (currentStatusIndex + 1) % statusMessages.length;
   currentTypeIndex = (currentTypeIndex + 1) % statusTypes.length;
 }

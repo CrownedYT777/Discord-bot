@@ -211,7 +211,7 @@ client.on('interactionCreate', async interaction => {
 });
 
 // Custom Status Management
-const statusMessages = ["🎧 Listening to Spotify", "🎮 Playing GTA VI", "📱Watching YouTube"];
+const statusMessages = ["🎧 Listening to Spotify", "🎮 Playing GTA VI", "👾Im a prototype model!"];
 const statusTypes = ['dnd', 'idle', 'online'];
 let currentStatusIndex = 0;
 let currentTypeIndex = 0;

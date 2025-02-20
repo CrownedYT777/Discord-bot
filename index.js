@@ -16,17 +16,6 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBit
 
 // Commands Definition
 const commands = {
-  ping: {
-    data: { name: 'ping', description: 'Replies with the bot\'s latency' },
-    async execute(interaction) {
-      await interaction.reply('Calculating latency...');
-      const sent = await interaction.fetchReply();
-      const latency = sent.createdTimestamp - interaction.createdTimestamp;
-      const apiLatency = interaction.client.ws.ping;
-      await interaction.editReply(`🏓 Pong! Bot Latency is **${latency}ms**. API Latency is **${apiLatency}ms**.`);
-    },
-  },
-
   mcstatus: {
     data: {
       name: 'mcstatus',

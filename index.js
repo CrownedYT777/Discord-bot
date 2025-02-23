@@ -69,6 +69,32 @@ const commands = [
         .addStringOption(option => option.setName('server_ip').setDescription('Server IP').setRequired(true))
 ].map(command => command.toJSON());
 
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isChatInputCommand()) return;
+    
+    if (interaction.commandName === 'welcome-setup') {
+        await interaction.deferReply({ ephemeral: true });
+        
+        const backgroundImage = interaction.options.getString('background_image');
+        const welcomeMessage = interaction.options.getString('welcome_message');
+        const channel = interaction.options.getChannel('channel');
+
+        if (!channel.isTextBased()) {
+            return interaction.editReply("❌ Please select a valid text channel.");
+        }
+
+        welcomeSettings[interaction.guild.id] = {
+            backgroundImage,
+            welcomeMessage,
+            channelId: channel.id
+        };
+
+        fs.writeFileSync(SETTINGS_FILE, JSON.stringify(welcomeSettings, null, 4));
+
+        await interaction.editReply("✅ Welcome system configured!");
+    }
+});
+
 client.on('guildMemberAdd', async (member) => {
     const settings = welcomeSettings[member.guild.id];
     if (!settings) return;
@@ -99,3 +125,4 @@ const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 })();
 
 client.login(process.env.TOKEN);
+ 

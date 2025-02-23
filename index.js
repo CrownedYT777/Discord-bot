@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, ActivityType, PermissionsBitField, REST, Routes, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { Client, GatewayIntentBits, ActivityType, PermissionsBitField, REST, Routes, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
 const axios = require('axios');
 const express = require('express');
 const fs = require('fs');
@@ -27,6 +27,48 @@ if (fs.existsSync(SETTINGS_FILE)) {
     welcomeSettings = JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8"));
 }
 
+const commands = [
+    new SlashCommandBuilder().setName('welcome-setup').setDescription('Setup the welcome message')
+        .addStringOption(option => option.setName('background_image').setDescription('Enter the background image URL').setRequired(true))
+        .addStringOption(option => option.setName('welcome_message').setDescription('Enter the welcome message').setRequired(true))
+        .addChannelOption(option => option.setName('channel').setDescription('Select the welcome channel').setRequired(true)),
+    
+    new SlashCommandBuilder().setName('kick').setDescription('Kick a user')
+        .addUserOption(option => option.setName('user').setDescription('User to kick').setRequired(true))
+        .addStringOption(option => option.setName('reason').setDescription('Reason for kick'))
+        .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers),
+
+    new SlashCommandBuilder().setName('ban').setDescription('Ban a user')
+        .addUserOption(option => option.setName('user').setDescription('User to ban').setRequired(true))
+        .addStringOption(option => option.setName('reason').setDescription('Reason for ban'))
+        .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
+
+    new SlashCommandBuilder().setName('unban').setDescription('Unban a user')
+        .addStringOption(option => option.setName('userid').setDescription('ID of user to unban').setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
+
+    new SlashCommandBuilder().setName('mute').setDescription('Mute a user')
+        .addUserOption(option => option.setName('user').setDescription('User to mute').setRequired(true))
+        .addIntegerOption(option => option.setName('duration').setDescription('Duration in minutes').setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+
+    new SlashCommandBuilder().setName('timeout').setDescription('Apply timeout to a user')
+        .addUserOption(option => option.setName('user').setDescription('User to timeout').setRequired(true))
+        .addIntegerOption(option => option.setName('duration').setDescription('Duration in minutes').setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+
+    new SlashCommandBuilder().setName('purge').setDescription('Delete messages')
+        .addIntegerOption(option => option.setName('amount').setDescription('Number of messages').setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+
+    new SlashCommandBuilder().setName('invite').setDescription('Get bot invite link'),
+
+    new SlashCommandBuilder().setName('ping').setDescription('Get bot latency'),
+
+    new SlashCommandBuilder().setName('mcstatus').setDescription('Get Minecraft server status')
+        .addStringOption(option => option.setName('server_ip').setDescription('Server IP').setRequired(true))
+].map(command => command.toJSON());
+
 client.on('guildMemberAdd', async (member) => {
     const settings = welcomeSettings[member.guild.id];
     if (!settings) return;
@@ -44,101 +86,16 @@ client.on('guildMemberAdd', async (member) => {
     welcomeChannel.send(welcomeImageURL);
 });
 
-const commands = {
-  ping: {
-    data: { name: 'ping', description: 'Replies with Pong!' },
-    async execute(interaction) {
-      const embed = new EmbedBuilder()
-        .setColor(0x00ff00)
-        .setTitle('🏓 Pong!')
-        .setDescription(`Latency: ${client.ws.ping}ms`);
-      await interaction.reply({ embeds: [embed] });
-    },
-  },
-  purge: {
-    data: {
-      name: 'purge',
-      description: 'Deletes a specified number of messages.',
-      options: [{ type: 4, name: 'amount', description: 'Number of messages to delete', required: true }],
-    },
-    async execute(interaction) {
-      const amount = interaction.options.getInteger('amount');
-      if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
-        return interaction.reply({ content: 'You don’t have permission to delete messages!', ephemeral: true });
-      }
-      if (amount < 1 || amount > 100) {
-        return interaction.reply({ content: 'You can delete between 1 and 100 messages.', ephemeral: true });
-      }
-      await interaction.channel.bulkDelete(amount, true);
-      await interaction.reply({ content: `🧹 Deleted ${amount} messages.`, ephemeral: true });
-    },
-  },
-  mute: {
-    data: {
-      name: 'mute',
-      description: 'Mutes a member.',
-      options: [{ type: 6, name: 'user', description: 'User to mute', required: true }],
-    },
-    async execute(interaction) {
-      const member = interaction.options.getMember('user');
-      if (!interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
-        return interaction.reply({ content: 'You don’t have permission to mute members!', ephemeral: true });
-      }
-      try {
-        await member.timeout(60 * 60 * 1000, 'Muted by command');
-        await interaction.reply(`🔇 Muted ${member.user.tag} for 1 hour.`);
-      } catch {
-        await interaction.reply({ content: 'Failed to mute the member.', ephemeral: true });
-      }
-    },
-  },
-  timeout: {
-    data: {
-      name: 'timeout',
-      description: 'Temporarily timeouts a member.',
-      options: [
-        { type: 6, name: 'user', description: 'User to timeout', required: true },
-        { type: 4, name: 'minutes', description: 'Minutes to timeout', required: true },
-      ],
-    },
-    async execute(interaction) {
-      const member = interaction.options.getMember('user');
-      const minutes = interaction.options.getInteger('minutes');
-      if (!interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
-        return interaction.reply({ content: 'You don’t have permission to timeout members!', ephemeral: true });
-      }
-      try {
-        await member.timeout(minutes * 60 * 1000, `Timed out for ${minutes} minutes`);
-        await interaction.reply(`⏳ Timed out ${member.user.tag} for ${minutes} minutes.`);
-      } catch {
-        await interaction.reply({ content: 'Failed to timeout the member.', ephemeral: true });
-      }
-    },
-  }
-};
-
 // Register Commands Globally
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 (async () => {
-  try {
-    const commandsData = Object.values(commands).map(command => command.data);
-    await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commandsData });
-    console.log('Successfully registered slash commands globally.');
-  } catch (error) {
-    console.error('Error registering commands:', error);
-  }
+    try {
+        console.log('Registering slash commands...');
+        await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commands });
+        console.log('Slash commands registered!');
+    } catch (error) {
+        console.error(error);
+    }
 })();
-
-// Interaction Handling
-client.on('interactionCreate', async interaction => {
-  if (!interaction.isChatInputCommand()) return;
-  const command = commands[interaction.commandName];
-  if (!command) return;
-  try {
-    await command.execute(interaction);
-  } catch {
-    await interaction.reply({ content: 'There was an error executing this command.', ephemeral: true });
-  }
-});
 
 client.login(process.env.TOKEN);

@@ -14,6 +14,30 @@ app.listen(PORT, () => console.log(`HTTP server running on port ${PORT}`));
 // Discord Client
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
+// Status Update System
+const statusMessages = ["🎧 Listening to Spotify", "🎮 Playing Minecraft", "🤖 Running MortalCraftz Bot"];
+const statusTypes = ['dnd', 'idle', 'online'];
+let currentStatusIndex = 0;
+let currentTypeIndex = 0;
+
+function updateStatus() {
+    const currentStatus = statusMessages[currentStatusIndex];
+    const currentType = statusTypes[currentTypeIndex];
+    client.user.setPresence({
+        activities: [{ name: currentStatus, type: ActivityType.Playing }],
+        status: currentType,
+    });
+    console.log('[ STATUS ] Updated to:', `${currentStatus} (${currentType})`);
+    currentStatusIndex = (currentStatusIndex + 1) % statusMessages.length;
+    currentTypeIndex = (currentTypeIndex + 1) % statusTypes.length;
+}
+
+function heartbeat() {
+    setInterval(() => {
+        console.log('[ HEARTBEAT ] Bot is alive');
+    }, 30000);
+}
+
 // Welcome Setup
 const SETTINGS_DIR = path.join(__dirname, "maintenance");
 const SETTINGS_FILE = path.join(SETTINGS_DIR, "welcomeSettings.json");
@@ -69,49 +93,6 @@ const commands = [
         .addStringOption(option => option.setName('server_ip').setDescription('Server IP').setRequired(true))
 ].map(command => command.toJSON());
 
-client.on('interactionCreate', async interaction => {
-    if (!interaction.isChatInputCommand()) return;
-    
-    if (interaction.commandName === 'welcome-setup') {
-        await interaction.deferReply({ ephemeral: true });
-        
-        const backgroundImage = interaction.options.getString('background_image');
-        const welcomeMessage = interaction.options.getString('welcome_message');
-        const channel = interaction.options.getChannel('channel');
-
-        if (!channel.isTextBased()) {
-            return interaction.editReply("❌ Please select a valid text channel.");
-        }
-
-        welcomeSettings[interaction.guild.id] = {
-            backgroundImage,
-            welcomeMessage,
-            channelId: channel.id
-        };
-
-        fs.writeFileSync(SETTINGS_FILE, JSON.stringify(welcomeSettings, null, 4));
-
-        await interaction.editReply("✅ Welcome system configured!");
-    }
-});
-
-client.on('guildMemberAdd', async (member) => {
-    const settings = welcomeSettings[member.guild.id];
-    if (!settings) return;
-
-    const welcomeChannel = member.guild.channels.cache.get(settings.channelId);
-    if (!welcomeChannel) return;
-
-    let userAvatar = member.user.displayAvatarURL({ format: 'png' }).replace(".webp", ".png");
-    const userNameEncoded = encodeURIComponent(member.user.username);
-    const serverMembers = member.guild.memberCount;
-    const welcomeTextEncoded = settings.welcomeMessage.replace(/ /g, '+');
-
-    const welcomeImageURL = `https://api.popcat.xyz/welcomecard?background=${settings.backgroundImage}&width=787&height=400&text1=${userNameEncoded}&text2=${welcomeTextEncoded}&text3=Member+%23${serverMembers}&avatar=${userAvatar}`;
-
-    welcomeChannel.send(welcomeImageURL);
-});
-
 // Register Commands Globally
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 (async () => {
@@ -124,5 +105,21 @@ const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
     }
 })();
 
+client.once('ready', () => {
+    console.log(`Logged in as ${client.user.tag}!`);
+    updateStatus();
+    setInterval(updateStatus, 10000);
+    heartbeat();
+});
+
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isChatInputCommand()) return;
+    await interaction.deferReply({ ephemeral: true });
+    
+    if (interaction.commandName === 'ping') {
+        await interaction.editReply(`🏓 Pong! Latency: ${client.ws.ping}ms`);
+    }
+});
+
 client.login(process.env.TOKEN);
- 
+    

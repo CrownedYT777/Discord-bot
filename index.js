@@ -1,185 +1,129 @@
-const { Client, GatewayIntentBits, ActivityType, PermissionsBitField, REST, Routes } = require('discord.js');
+const { Client, GatewayIntentBits, ActivityType, PermissionsBitField, REST, Routes, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const axios = require('axios');
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
 // HTTP Server to Keep the Bot Running
 const app = express();
-app.get('/', (req, res) => {
-  res.send('Bot is running!');
-});
+app.get('/', (req, res) => res.send('Bot is running!'));
 const PORT = 3000;
 app.listen(PORT, () => console.log(`HTTP server running on port ${PORT}`));
 
 // Discord Client
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers] });
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
-// Commands Definition
+// Welcome Setup
+const SETTINGS_DIR = path.join(__dirname, "maintenance");
+const SETTINGS_FILE = path.join(SETTINGS_DIR, "welcomeSettings.json");
+
+if (!fs.existsSync(SETTINGS_DIR)) {
+    fs.mkdirSync(SETTINGS_DIR);
+}
+
+let welcomeSettings = {};
+if (fs.existsSync(SETTINGS_FILE)) {
+    welcomeSettings = JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8"));
+}
+
+client.on('guildMemberAdd', async (member) => {
+    const settings = welcomeSettings[member.guild.id];
+    if (!settings) return;
+
+    const welcomeChannel = member.guild.channels.cache.get(settings.channelId);
+    if (!welcomeChannel) return;
+
+    let userAvatar = member.user.displayAvatarURL({ format: 'png' }).replace(".webp", ".png");
+    const userNameEncoded = encodeURIComponent(member.user.username);
+    const serverMembers = member.guild.memberCount;
+    const welcomeTextEncoded = settings.welcomeMessage.replace(/ /g, '+');
+
+    const welcomeImageURL = `https://api.popcat.xyz/welcomecard?background=${settings.backgroundImage}&width=787&height=400&text1=${userNameEncoded}&text2=${welcomeTextEncoded}&text3=Member+%23${serverMembers}&avatar=${userAvatar}`;
+
+    welcomeChannel.send(welcomeImageURL);
+});
+
 const commands = {
-  mcstatus: {
-    data: {
-      name: 'mcstatus',
-      description: 'Get the status of a Minecraft server (Java or Bedrock)',
-      options: [
-        { type: 3, name: 'ip', description: 'The IP address of the Minecraft server', required: true },
-        {
-          type: 3,
-          name: 'type',
-          description: 'The type of Minecraft server (java or bedrock)',
-          required: true,
-          choices: [{ name: 'Java', value: 'java' }, { name: 'Bedrock', value: 'bedrock' }],
-        },
-        { type: 4, name: 'port', description: 'The port of the server (required for Bedrock)', required: false },
-      ],
-    },
+  ping: {
+    data: { name: 'ping', description: 'Replies with Pong!' },
     async execute(interaction) {
-      const ip = interaction.options.getString('ip');
-      const type = interaction.options.getString('type');
-      const port = interaction.options.getInteger('port') || (type === 'bedrock' ? 19132 : undefined);
-
-      await interaction.reply('Fetching server status...');
-      try {
-        const url =
-          type === 'java'
-            ? `https://api.mcstatus.io/v2/status/java/${ip}`
-            : `https://api.mcstatus.io/v2/status/bedrock/${ip}:${port}`;
-
-        const response = await axios.get(url);
-        const data = response.data;
-
-        if (data.online) {
-          const players = data.players.online || 0;
-          const maxPlayers = data.players.max || 'Unknown';
-          const version = data.version?.name || 'Unknown';
-          const motd = data.motd?.clean || 'No MOTD available';
-          const latency = data.latency || 'Unknown';
-
-          const serverInfo =
-            `🏰 **Minecraft Server Status**:\n` +
-            `**Status:** 🟢 Online\n` +
-            `**IP:** ${ip}\n` +
-            (type === 'bedrock' ? `**Port:** ${port}\n` : '') +
-            `**Players:** ${players}/${maxPlayers}\n` +
-            `**Version:** ${version}\n` +
-            `**MOTD:** ${motd}\n` +
-            `**Latency:** ${latency}ms`;
-
-          await interaction.editReply(serverInfo);
-        } else {
-          await interaction.editReply(
-            `🏰 **Minecraft Server Status**:\n` +
-            `**Status:** 🔴 Offline\n` +
-            `**IP:** ${ip}\n` +
-            (type === 'bedrock' ? `**Port:** ${port}\n` : '') +
-            `The server is currently offline or unreachable.`
-          );
-        }
-      } catch (error) {
-        await interaction.editReply(
-          `❌ Unable to fetch the status of the server: ${ip}${type === 'bedrock' ? `:${port}` : ''}\n` +
-          `Ensure the IP address and type are correct.`
-        );
-      }
+      const embed = new EmbedBuilder()
+        .setColor(0x00ff00)
+        .setTitle('🏓 Pong!')
+        .setDescription(`Latency: ${client.ws.ping}ms`);
+      await interaction.reply({ embeds: [embed] });
     },
   },
-
-  kick: {
+  purge: {
     data: {
-      name: 'kick',
-      description: 'Kicks a member from the server.',
-      options: [
-        { type: 6, name: 'user', description: 'The user to kick', required: true },
-        { type: 3, name: 'reason', description: 'Reason for the kick', required: false },
-      ],
+      name: 'purge',
+      description: 'Deletes a specified number of messages.',
+      options: [{ type: 4, name: 'amount', description: 'Number of messages to delete', required: true }],
     },
     async execute(interaction) {
-      const user = interaction.options.getUser('user');
-      const reason = interaction.options.getString('reason') || 'No reason provided';
-      const member = interaction.guild.members.cache.get(user.id);
-
-      if (!interaction.member.permissions.has(PermissionsBitField.Flags.KickMembers)) {
-        return interaction.reply({ content: 'You don’t have permission to kick members!', ephemeral: true });
+      const amount = interaction.options.getInteger('amount');
+      if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
+        return interaction.reply({ content: 'You don’t have permission to delete messages!', ephemeral: true });
       }
-
+      if (amount < 1 || amount > 100) {
+        return interaction.reply({ content: 'You can delete between 1 and 100 messages.', ephemeral: true });
+      }
+      await interaction.channel.bulkDelete(amount, true);
+      await interaction.reply({ content: `🧹 Deleted ${amount} messages.`, ephemeral: true });
+    },
+  },
+  mute: {
+    data: {
+      name: 'mute',
+      description: 'Mutes a member.',
+      options: [{ type: 6, name: 'user', description: 'User to mute', required: true }],
+    },
+    async execute(interaction) {
+      const member = interaction.options.getMember('user');
+      if (!interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
+        return interaction.reply({ content: 'You don’t have permission to mute members!', ephemeral: true });
+      }
       try {
-        await member.kick(reason);
-        await interaction.reply(`✅ Successfully kicked ${user.tag}.\nReason: ${reason}`);
+        await member.timeout(60 * 60 * 1000, 'Muted by command');
+        await interaction.reply(`🔇 Muted ${member.user.tag} for 1 hour.`);
       } catch {
-        await interaction.reply({ content: 'Failed to kick the member.', ephemeral: true });
+        await interaction.reply({ content: 'Failed to mute the member.', ephemeral: true });
       }
     },
   },
-
-  ban: {
+  timeout: {
     data: {
-      name: 'ban',
-      description: 'Bans a member from the server.',
+      name: 'timeout',
+      description: 'Temporarily timeouts a member.',
       options: [
-        { type: 6, name: 'user', description: 'The user to ban', required: true },
-        { type: 3, name: 'reason', description: 'Reason for the ban', required: false },
+        { type: 6, name: 'user', description: 'User to timeout', required: true },
+        { type: 4, name: 'minutes', description: 'Minutes to timeout', required: true },
       ],
     },
     async execute(interaction) {
-      const user = interaction.options.getUser('user');
-      const reason = interaction.options.getString('reason') || 'No reason provided';
-
-      if (!interaction.member.permissions.has(PermissionsBitField.Flags.BanMembers)) {
-        return interaction.reply({ content: 'You don’t have permission to ban members!', ephemeral: true });
+      const member = interaction.options.getMember('user');
+      const minutes = interaction.options.getInteger('minutes');
+      if (!interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
+        return interaction.reply({ content: 'You don’t have permission to timeout members!', ephemeral: true });
       }
-
       try {
-        await interaction.guild.members.ban(user.id, { reason });
-        await interaction.reply(`✅ Successfully banned ${user.tag}.\nReason: ${reason}`);
+        await member.timeout(minutes * 60 * 1000, `Timed out for ${minutes} minutes`);
+        await interaction.reply(`⏳ Timed out ${member.user.tag} for ${minutes} minutes.`);
       } catch {
-        await interaction.reply({ content: 'Failed to ban the member.', ephemeral: true });
+        await interaction.reply({ content: 'Failed to timeout the member.', ephemeral: true });
       }
     },
-  },
-
-  unban: {
-    data: {
-      name: 'unban',
-      description: 'Unbans a member from the server.',
-      options: [
-        { type: 3, name: 'user_id', description: 'The ID of the user to unban', required: true },
-      ],
-    },
-    async execute(interaction) {
-      const userId = interaction.options.getString('user_id');
-
-      if (!interaction.member.permissions.has(PermissionsBitField.Flags.BanMembers)) {
-        return interaction.reply({ content: 'You don’t have permission to unban members!', ephemeral: true });
-      }
-
-      try {
-        await interaction.guild.members.unban(userId);
-        await interaction.reply(`✅ Successfully unbanned user with ID: ${userId}`);
-      } catch {
-        await interaction.reply({ content: 'Failed to unban the user. Check the ID.', ephemeral: true });
-      }
-    },
-  },
-
-  invite: {
-    data: { name: 'invite', description: 'Sends the bot invite link.' },
-    async execute(interaction) {
-      const inviteLink = `https://discord.com/api/oauth2/authorize?client_id=${process.env.CLIENT_ID}&permissions=8&scope=bot%20applications.commands`;
-      await interaction.reply(`🤖 Invite me to your server using this link:\n${inviteLink}`);
-    },
-  },
+  }
 };
 
-// Register Commands
+// Register Commands Globally
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
-
 (async () => {
   try {
     const commandsData = Object.values(commands).map(command => command.data);
-    await rest.put(
-      Routes.applicationCommands(process.env.CLIENT_ID),
-      { body: commandsData }
-    );
-    console.log('Successfully registered slash commands.');
+    await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commandsData });
+    console.log('Successfully registered slash commands globally.');
   } catch (error) {
     console.error('Error registering commands:', error);
   }
@@ -188,46 +132,13 @@ const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 // Interaction Handling
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
-
   const command = commands[interaction.commandName];
   if (!command) return;
-
   try {
     await command.execute(interaction);
   } catch {
     await interaction.reply({ content: 'There was an error executing this command.', ephemeral: true });
   }
-});
-
-// Custom Status Management
-const statusMessages = ["🎧 Listening to Spotify", "🎮 Playing GTA VI", "👾Im a prototype model!"];
-const statusTypes = ['dnd', 'idle', 'online'];
-let currentStatusIndex = 0;
-let currentTypeIndex = 0;
-
-function updateStatus() {
-  const currentStatus = statusMessages[currentStatusIndex];
-  const currentType = statusTypes[currentTypeIndex];
-  client.user.setPresence({
-    activities: [{ name: currentStatus, type: ActivityType.Custom }],
-    status: currentType,
-  });
-  console.log('[ STATUS ] Updated status to:', `${currentStatus} (${currentType})`);
-  currentStatusIndex = (currentStatusIndex + 1) % statusMessages.length;
-  currentTypeIndex = (currentTypeIndex + 1) % statusTypes.length;
-}
-
-function heartbeat() {
-  setInterval(() => {
-    console.log('[ HEARTBEAT ] Bot is alive');
-  }, 30000);
-}
-
-client.once('ready', () => {
-  console.log(`Logged in as ${client.user.tag}!`);
-  updateStatus();
-  setInterval(updateStatus, 10000);
-  heartbeat();
 });
 
 client.login(process.env.TOKEN);

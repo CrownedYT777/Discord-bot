@@ -1,9 +1,20 @@
-const { Client, GatewayIntentBits, ActivityType, PermissionsBitField, REST, Routes, EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, ActivityType, PermissionsBitField, REST, Routes } = require('discord.js');
 const axios = require('axios');
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
+
+const SETTINGS_DIR = path.join(__dirname, "maintenance");
+const SETTINGS_FILE = path.join(SETTINGS_DIR, "welcomeSettings.json");
+
+// Ensure maintenance directory exists
+if (!fs.existsSync(SETTINGS_DIR)) {
+    fs.mkdirSync(SETTINGS_DIR);
+}
+
+// Load existing settings
+let welcomeSettings = fs.existsSync(SETTINGS_FILE) ? JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8")) : {};
 
 // HTTP Server to Keep the Bot Running
 const app = express();
@@ -12,114 +23,185 @@ const PORT = 3000;
 app.listen(PORT, () => console.log(`HTTP server running on port ${PORT}`));
 
 // Discord Client
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessages
+    ]
+});
 
-// Status Update System
-const statusMessages = ["🎧 Listening to Spotify", "🎮 Playing Minecraft", "🤖 Running MortalCraftz Bot"];
-const statusTypes = ['dnd', 'idle', 'online'];
-let currentStatusIndex = 0;
-let currentTypeIndex = 0;
+// Commands Definition
+const commands = {
+    welcomeSetup: {
+        data: {
+            name: 'welcome-setup',
+            description: 'Setup the welcome message',
+            options: [
+                { type: 3, name: 'background_image', description: 'Enter background image URL', required: true },
+                { type: 3, name: 'welcome_message', description: 'Enter the welcome message', required: true },
+                { type: 7, name: 'channel', description: 'Select the welcome channel', required: true }
+            ],
+        },
+        async execute(interaction) {
+            if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+                return interaction.reply({ content: "❌ You don't have permission to use this command.", ephemeral: true });
+            }
 
-function updateStatus() {
-    const currentStatus = statusMessages[currentStatusIndex];
-    const currentType = statusTypes[currentTypeIndex];
-    client.user.setPresence({
-        activities: [{ name: currentStatus, type: ActivityType.Playing }],
-        status: currentType,
-    });
-    console.log('[ STATUS ] Updated to:', `${currentStatus} (${currentType})`);
-    currentStatusIndex = (currentStatusIndex + 1) % statusMessages.length;
-    currentTypeIndex = (currentTypeIndex + 1) % statusTypes.length;
-}
+            const backgroundImage = interaction.options.getString('background_image');
+            const welcomeMessage = interaction.options.getString('welcome_message');
+            const channel = interaction.options.getChannel('channel');
 
-function heartbeat() {
-    setInterval(() => {
-        console.log('[ HEARTBEAT ] Bot is alive');
-    }, 30000);
-}
+            welcomeSettings[interaction.guildId] = {
+                backgroundImage,
+                welcomeMessage,
+                channelId: channel.id
+            };
 
-// Welcome Setup
-const SETTINGS_DIR = path.join(__dirname, "maintenance");
-const SETTINGS_FILE = path.join(SETTINGS_DIR, "welcomeSettings.json");
+            // Save settings to file
+            fs.writeFileSync(SETTINGS_FILE, JSON.stringify(welcomeSettings, null, 2));
 
-if (!fs.existsSync(SETTINGS_DIR)) {
-    fs.mkdirSync(SETTINGS_DIR);
-}
+            await interaction.reply(`✅ Welcome setup complete! Messages will be sent in <#${channel.id}>.`);
+        }
+    },
 
-let welcomeSettings = {};
-if (fs.existsSync(SETTINGS_FILE)) {
-    welcomeSettings = JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8"));
-}
+    ping: {
+        data: { name: 'ping', description: 'Replies with Pong!' },
+        async execute(interaction) {
+            await interaction.reply('Pong! 🏓');
+        },
+    },
 
-const commands = [
-    new SlashCommandBuilder().setName('welcome-setup').setDescription('Setup the welcome message')
-        .addStringOption(option => option.setName('background_image').setDescription('Enter the background image URL').setRequired(true))
-        .addStringOption(option => option.setName('welcome_message').setDescription('Enter the welcome message').setRequired(true))
-        .addChannelOption(option => option.setName('channel').setDescription('Select the welcome channel').setRequired(true)),
-    
-    new SlashCommandBuilder().setName('kick').setDescription('Kick a user')
-        .addUserOption(option => option.setName('user').setDescription('User to kick').setRequired(true))
-        .addStringOption(option => option.setName('reason').setDescription('Reason for kick'))
-        .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers),
+    purge: {
+        data: {
+            name: 'purge',
+            description: 'Deletes messages in bulk',
+            options: [{ type: 4, name: 'amount', description: 'Number of messages to delete (1-100)', required: true }],
+        },
+        async execute(interaction) {
+            if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
+                return interaction.reply({ content: 'You lack permission to manage messages.', ephemeral: true });
+            }
 
-    new SlashCommandBuilder().setName('ban').setDescription('Ban a user')
-        .addUserOption(option => option.setName('user').setDescription('User to ban').setRequired(true))
-        .addStringOption(option => option.setName('reason').setDescription('Reason for ban'))
-        .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
+            const amount = interaction.options.getInteger('amount');
+            if (amount < 1 || amount > 100) return interaction.reply('You can delete between 1 and 100 messages.');
 
-    new SlashCommandBuilder().setName('unban').setDescription('Unban a user')
-        .addStringOption(option => option.setName('userid').setDescription('ID of user to unban').setRequired(true))
-        .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
+            const channel = interaction.channel;
+            await channel.bulkDelete(amount, true);
+            await interaction.reply(`🗑️ Deleted ${amount} messages.`);
+        },
+    },
 
-    new SlashCommandBuilder().setName('mute').setDescription('Mute a user')
-        .addUserOption(option => option.setName('user').setDescription('User to mute').setRequired(true))
-        .addIntegerOption(option => option.setName('duration').setDescription('Duration in minutes').setRequired(true))
-        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+    addrole: {
+        data: {
+            name: 'addrole',
+            description: 'Adds a role to a user',
+            options: [
+                { type: 6, name: 'user', description: 'User to assign role', required: true },
+                { type: 8, name: 'role', description: 'Role to assign', required: true },
+            ],
+        },
+        async execute(interaction) {
+            if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
+                return interaction.reply({ content: 'You lack permission to manage roles.', ephemeral: true });
+            }
 
-    new SlashCommandBuilder().setName('timeout').setDescription('Apply timeout to a user')
-        .addUserOption(option => option.setName('user').setDescription('User to timeout').setRequired(true))
-        .addIntegerOption(option => option.setName('duration').setDescription('Duration in minutes').setRequired(true))
-        .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
+            const user = interaction.options.getMember('user');
+            const role = interaction.options.getRole('role');
 
-    new SlashCommandBuilder().setName('purge').setDescription('Delete messages')
-        .addIntegerOption(option => option.setName('amount').setDescription('Number of messages').setRequired(true))
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+            await user.roles.add(role);
+            await interaction.reply(`✅ ${role.name} role added to ${user.user.tag}.`);
+        },
+    },
 
-    new SlashCommandBuilder().setName('invite').setDescription('Get bot invite link'),
+    removerole: {
+        data: {
+            name: 'removerole',
+            description: 'Removes a role from a user',
+            options: [
+                { type: 6, name: 'user', description: 'User to remove role from', required: true },
+                { type: 8, name: 'role', description: 'Role to remove', required: true },
+            ],
+        },
+        async execute(interaction) {
+            if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
+                return interaction.reply({ content: 'You lack permission to manage roles.', ephemeral: true });
+            }
 
-    new SlashCommandBuilder().setName('ping').setDescription('Get bot latency'),
+            const user = interaction.options.getMember('user');
+            const role = interaction.options.getRole('role');
 
-    new SlashCommandBuilder().setName('mcstatus').setDescription('Get Minecraft server status')
-        .addStringOption(option => option.setName('server_ip').setDescription('Server IP').setRequired(true))
-].map(command => command.toJSON());
+            await user.roles.remove(role);
+            await interaction.reply(`✅ ${role.name} role removed from ${user.user.tag}.`);
+        },
+    },
 
-// Register Commands Globally
+    blacklistWord: {
+        data: {
+            name: 'blacklist-word',
+            description: 'Blacklists a word from being used in chat',
+            options: [{ type: 3, name: 'word', description: 'Word to blacklist', required: true }],
+        },
+        async execute(interaction) {
+            const word = interaction.options.getString('word');
+            // Implement blacklist logic here
+            await interaction.reply(`🚫 Blacklisted word: ${word}`);
+        },
+    },
+
+    whitelistWord: {
+        data: {
+            name: 'whitelist-word',
+            description: 'Removes a word from the blacklist',
+            options: [{ type: 3, name: 'word', description: 'Word to whitelist', required: true }],
+        },
+        async execute(interaction) {
+            const word = interaction.options.getString('word');
+            // Implement whitelist logic here
+            await interaction.reply(`✅ Whitelisted word: ${word}`);
+        },
+    },
+};
+
+// Register Commands
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 (async () => {
     try {
-        console.log('Registering slash commands...');
-        await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commands });
-        console.log('Slash commands registered!');
+        const commandsData = Object.values(commands).map(command => command.data);
+        await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commandsData });
+        console.log('✅ Successfully registered slash commands.');
     } catch (error) {
-        console.error(error);
+        console.error('❌ Error registering commands:', error);
     }
 })();
 
-client.once('ready', () => {
-    console.log(`Logged in as ${client.user.tag}!`);
-    updateStatus();
-    setInterval(updateStatus, 10000);
-    heartbeat();
-});
-
+// Interaction Handling
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
-    await interaction.deferReply({ ephemeral: true });
-    
-    if (interaction.commandName === 'ping') {
-        await interaction.editReply(`🏓 Pong! Latency: ${client.ws.ping}ms`);
+
+    const command = commands[interaction.commandName];
+    if (!command) return;
+
+    try {
+        await command.execute(interaction);
+    } catch (error) {
+        console.error(error);
+        await interaction.reply({ content: '⚠️ There was an error executing this command.', ephemeral: true });
     }
 });
 
+// Welcome Message Handler (Fixed PNG Issue)
+client.on('guildMemberAdd', async (member) => {
+    const settings = welcomeSettings[member.guild.id];
+    if (!settings) return;
+
+    const welcomeChannel = member.guild.channels.cache.get(settings.channelId);
+    if (!welcomeChannel) return;
+
+    const welcomeImageURL = `https://api.popcat.xyz/welcomecard?background=${encodeURIComponent(settings.backgroundImage)}&text1=${encodeURIComponent(member.user.username)}&text2=${encodeURIComponent(settings.welcomeMessage)}&text3=Member+%23${member.guild.memberCount}&avatar=${member.user.displayAvatarURL()}`.replace('.webp', '.png');
+
+    welcomeChannel.send(welcomeImageURL);
+});
+
+client.once('ready', () => console.log(`✅ Logged in as ${client.user.tag}!`));
 client.login(process.env.TOKEN);
-    

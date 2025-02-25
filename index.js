@@ -1,5 +1,4 @@
 const { Client, GatewayIntentBits, ActivityType, PermissionsBitField, REST, Routes } = require('discord.js');
-const axios = require('axios');
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
@@ -7,44 +6,35 @@ require('dotenv').config();
 
 const SETTINGS_DIR = path.join(__dirname, "maintenance");
 const SETTINGS_FILE = path.join(SETTINGS_DIR, "welcomeSettings.json");
+const BLACKLIST_FILE = path.join(SETTINGS_DIR, "blacklist.json");
 
-// Ensure maintenance directory exists
-if (!fs.existsSync(SETTINGS_DIR)) {
-    fs.mkdirSync(SETTINGS_DIR);
-}
-
-// Load existing settings
+if (!fs.existsSync(SETTINGS_DIR)) fs.mkdirSync(SETTINGS_DIR);
 let welcomeSettings = fs.existsSync(SETTINGS_FILE) ? JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8")) : {};
+let blacklistData = fs.existsSync(BLACKLIST_FILE) ? JSON.parse(fs.readFileSync(BLACKLIST_FILE, "utf8")) : {};
 
-// HTTP Server to Keep the Bot Running
+// HTTP Server for UptimeRobot
 const app = express();
 app.get('/', (req, res) => res.send('Bot is running!'));
-const PORT = 3000;
-app.listen(PORT, () => console.log(`HTTP server running on port ${PORT}`));
+app.listen(3000, () => console.log(`HTTP server running on port 3000`));
 
-// Discord Client
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildMessages
-    ]
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages]
 });
 
 // Commands Definition
 const commands = {
-    welcomeSetup: {
+    welcomesetup: {
         data: {
             name: 'welcome-setup',
-            description: 'Setup the welcome message',
+            discription: 'setup the welcome message',
             options: [
-                { type: 3, name: 'background_image', description: 'Enter background image URL', required: true },
-                { type: 3, name: 'welcome_message', description: 'Enter the welcome message', required: true },
-                { type: 7, name: 'channel', description: 'Select the welcome channel', required: true }
+                { type: 3, name: 'background_image', discription: 'Enter background image URL', required: true },
+                { type: 3, name: 'welcome_message', discription: 'Enter the welcome message', required: true },
+                { type: 7, name: 'channel', discription: 'Set the welcome message channel', required: true }
             ],
         },
         async execute(interaction) {
-            if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            if (!interaction.member.permission.has(PermissionsBitField.Flags.Administrator)) {
                 return interaction.reply({ content: "❌ You don't have permission to use this command.", ephemeral: true });
             }
 
@@ -58,13 +48,11 @@ const commands = {
                 channelId: channel.id
             };
 
-            // Save settings to file
             fs.writeFileSync(SETTINGS_FILE, JSON.stringify(welcomeSettings, null, 2));
-
             await interaction.reply(`✅ Welcome setup complete! Messages will be sent in <#${channel.id}>.`);
         }
     },
-
+  
     ping: {
         data: { name: 'ping', description: 'Replies with Pong!' },
         async execute(interaction) {
@@ -86,8 +74,7 @@ const commands = {
             const amount = interaction.options.getInteger('amount');
             if (amount < 1 || amount > 100) return interaction.reply('You can delete between 1 and 100 messages.');
 
-            const channel = interaction.channel;
-            await channel.bulkDelete(amount, true);
+            await interaction.channel.bulkDelete(amount, true);
             await interaction.reply(`🗑️ Deleted ${amount} messages.`);
         },
     },
@@ -143,9 +130,16 @@ const commands = {
             options: [{ type: 3, name: 'word', description: 'Word to blacklist', required: true }],
         },
         async execute(interaction) {
-            const word = interaction.options.getString('word');
-            // Implement blacklist logic here
-            await interaction.reply(`🚫 Blacklisted word: ${word}`);
+            if (!blacklistData[interaction.guildId]) blacklistData[interaction.guildId] = { blacklisted: [] };
+
+            const word = interaction.options.getString('word').toLowerCase();
+            if (!blacklistData[interaction.guildId].blacklisted.includes(word)) {
+                blacklistData[interaction.guildId].blacklisted.push(word);
+                fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(blacklistData, null, 2));
+                return interaction.reply(`🚫 The word **"${word}"** has been blacklisted.`);
+            } else {
+                return interaction.reply(`⚠️ The word **"${word}"** is already blacklisted.`);
+            }
         },
     },
 
@@ -156,20 +150,23 @@ const commands = {
             options: [{ type: 3, name: 'word', description: 'Word to whitelist', required: true }],
         },
         async execute(interaction) {
-            const word = interaction.options.getString('word');
-            // Implement whitelist logic here
-            await interaction.reply(`✅ Whitelisted word: ${word}`);
+            if (!blacklistData[interaction.guildId] || !blacklistData[interaction.guildId].blacklisted.includes(word)) {
+                return interaction.reply(`⚠️ The word **"${word}"** is not in the blacklist.`);
+            }
+
+            blacklistData[interaction.guildId].blacklisted = blacklistData[interaction.guildId].blacklisted.filter(w => w !== word);
+            fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(blacklistData, null, 2));
+            return interaction.reply(`✅ The word **"${word}"** has been removed from the blacklist.`);
         },
-    },
+    }
 };
 
-// Register Commands
+// Register Commands Globally
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 (async () => {
     try {
-        const commandsData = Object.values(commands).map(command => command.data);
-        await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commandsData });
-        console.log('✅ Successfully registered slash commands.');
+        await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: Object.values(commands).map(cmd => cmd.data) });
+        console.log('✅ Successfully registered global slash commands.');
     } catch (error) {
         console.error('❌ Error registering commands:', error);
     }
@@ -203,5 +200,35 @@ client.on('guildMemberAdd', async (member) => {
     welcomeChannel.send(welcomeImageURL);
 });
 
-client.once('ready', () => console.log(`✅ Logged in as ${client.user.tag}!`));
+// Status & Heartbeat Logging
+client.once('ready', () => {
+    console.log(`✅ Logged in as ${client.user.tag}!`);
+
+    const statusMessages = ["🎧 Listening to Music", "🎮 Playing Minecraft", "👾 Moderating Chat"];
+    const statusTypes = ['dnd', 'idle', 'online'];
+    let currentStatusIndex = 0;
+    let currentTypeIndex = 0;
+
+    function updateStatus() {
+        client.user.setPresence({
+            activities: [{ name: statusMessages[currentStatusIndex], type: ActivityType.Custom }],
+            status: statusTypes[currentTypeIndex],
+        });
+
+        console.log(`[ STATUS ] Updated to: ${statusMessages[currentStatusIndex]} (${statusTypes[currentTypeIndex]})`);
+
+        currentStatusIndex = (currentStatusIndex + 1) % statusMessages.length;
+        currentTypeIndex = (currentTypeIndex + 1) % statusTypes.length;
+    }
+
+    function heartbeat() {
+        console.log('[ HEARTBEAT ] Bot is alive');
+    }
+
+    updateStatus();
+    setInterval(updateStatus, 30000);
+    setInterval(heartbeat, 30000);
+});
+
 client.login(process.env.TOKEN);
+                

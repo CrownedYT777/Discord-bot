@@ -1,14 +1,11 @@
-const { Client, GatewayIntentBits, ActivityType, PermissionsBitField, REST, Routes } = require('discord.js');
+const { Client, GatewayIntentBits, PermissionsBitField, REST, Routes } = require('discord.js');
 const express = require('express');
 const fs = require('fs');
-const path = require('path');
 require('dotenv').config();
 
-const SETTINGS_DIR = path.join(__dirname, "maintenance");
-const SETTINGS_FILE = path.join(SETTINGS_DIR, "welcomeSettings.json");
-const BLACKLIST_FILE = path.join(SETTINGS_DIR, "blacklist.json");
+const SETTINGS_FILE = "welcomeSettings.json";
+const BLACKLIST_FILE = "blacklist.json";
 
-if (!fs.existsSync(SETTINGS_DIR)) fs.mkdirSync(SETTINGS_DIR);
 let welcomeSettings = fs.existsSync(SETTINGS_FILE) ? JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8")) : {};
 let blacklistData = fs.existsSync(BLACKLIST_FILE) ? JSON.parse(fs.readFileSync(BLACKLIST_FILE, "utf8")) : {};
 
@@ -21,11 +18,10 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent // Added for message-related commands
+        GatewayIntentBits.MessageContent
     ]
 });
 
-// Commands Definition
 const commands = {
     "welcome-setup": {
         data: {
@@ -47,11 +43,7 @@ const commands = {
             const welcomeMessage = interaction.options.getString('welcome_message') || "";
             const channel = interaction.options.getChannel('channel');
 
-            welcomeSettings[interaction.guildId] = {
-                backgroundImage,
-                welcomeMessage,
-                channelId: channel.id
-            };
+            welcomeSettings[interaction.guildId] = { backgroundImage, welcomeMessage, channelId: channel.id };
 
             try {
                 fs.writeFileSync(SETTINGS_FILE, JSON.stringify(welcomeSettings, null, 2));
@@ -61,38 +53,6 @@ const commands = {
                 return interaction.reply("❌ Failed to save welcome settings.");
             }
         }
-    },
-
-    ping: {
-        data: { name: 'ping', description: 'Replies with Pong!' },
-        async execute(interaction) {
-            await interaction.reply('Pong! 🏓');
-        },
-    },
-
-    purge: {
-        data: {
-            name: 'purge',
-            description: 'Deletes messages in bulk',
-            options: [{ type: 4, name: 'amount', description: 'Number of messages to delete (1-100)', required: true }],
-        },
-        async execute(interaction) {
-            if (!interaction.guild) return interaction.reply({ content: "❌ This command can only be used in a server.", ephemeral: true });
-            if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
-                return interaction.reply({ content: 'You lack permission to manage messages.', ephemeral: true });
-            }
-
-            const amount = interaction.options.getInteger('amount') || 1;
-            if (amount < 1 || amount > 100) return interaction.reply('❌ You can delete between 1 and 100 messages.');
-
-            try {
-                await interaction.channel.bulkDelete(amount, true);
-                await interaction.reply(`🗑️ Deleted ${amount} messages.`);
-            } catch (error) {
-                console.error("Error deleting messages:", error);
-                await interaction.reply("❌ Unable to delete messages. Ensure they are not older than 14 days.");
-            }
-        },
     },
 
     blacklistword: {

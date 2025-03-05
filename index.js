@@ -1,4 +1,3 @@
-
 const { Client, GatewayIntentBits, PermissionsBitField, REST, Routes, ActivityType } = require('discord.js');
 const fs = require('fs');
 const express = require('express');
@@ -8,13 +7,12 @@ require('dotenv').config();
 // Set up express server for keeping the bot alive
 const app = express();
 const port = 3000;
-
 app.get('/', (req, res) => {
-  res.send('Bot is running!');
+  const imagePath = path.join(__dirname, 'index.html');
+  res.sendFile(imagePath);
 });
-
 app.listen(port, () => {
-  console.log('\x1b[36m[ SERVER ]\x1b[0m', '\x1b[32m Server running on port: ' + port + ' ✅\x1b[0m');
+  console.log('\x1b[36m[ SERVER ]\x1b[0m', '\x1b[32m SH : https://localhost:' + port + ' ✅\x1b[0m');
 });
 
 const SETTINGS_FILE = "welcomeSettings.json";
@@ -531,7 +529,7 @@ if (!process.env.TOKEN || !process.env.CLIENT_ID) {
 }
 
 client.once('ready', async () => {
-    console.log(`✅ Bot is online as ${client.user.tag}`);
+    console.log(`✅ Logged in as ${client.user.tag}`);
     console.log('\x1b[36m[ INFO ]\x1b[0m', `\x1b[34mPing: ${client.ws.ping} ms \x1b[0m`);
     console.log('\x1b[36m[ INFO ]\x1b[0m', `\x1b[35mBot ID: ${client.user.id} \x1b[0m`);
     console.log('\x1b[36m[ INFO ]\x1b[0m', `\x1b[34mConnected to ${client.guilds.cache.size} server(s) \x1b[0m`);

@@ -492,7 +492,7 @@ if (!process.env.TOKEN || !process.env.CLIENT_ID) {
 }
 
 client.once('ready', async () => {
-    console.log(`✅ Bot is online as ${client.user.tag}`);
+    console.log(`✅ Logged in as ${client.user.tag}`);
     
     // Register Commands Globally
     const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);

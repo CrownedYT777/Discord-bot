@@ -520,6 +520,73 @@ const commands = {
         }
     }
 };
+"addrole": {
+   data: {
+       name: 'addrole',
+       description: 'Add a role to a member',
+       options: [
+           { type: 6, name: 'user', description: 'The user to add the role to', required: true },
+           { type: 8, name: 'role', description: 'The role to add', required: true }
+       ],
+   },
+        async execute(interaction) {
+            if (!interaction.guild) return interaction.reply({ content: "❌ This command can only be used in a server.", ephemeral: true });
+
+            if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
+                return interaction.reply({ content: "❌ You don't have permission to use this command.", ephemeral: true });
+            }
+
+            const user = interaction.options.getUser('user');
+            const role = interaction.options.getRole('role');
+            const member = interaction.guild.members.cache.get(user.id);
+
+            if (!member) {
+                return interaction.reply({ content: "❌ Unable to find that member.", ephemeral: true });
+            }
+
+            try {
+                await member.roles.add(role);
+                await interaction.reply({ content: `✅ Added role ${role.name} to ${user.tag}` });
+            } catch (error) {
+                console.error("Error adding role:", error);
+                return interaction.reply({ content: "❌ Failed to add the role.", ephemeral: true });
+            }
+        }
+    },
+    "removerole": {
+          data: {
+              name: 'removerole',
+              description: 'Remove a role from a member',
+              options: [
+                  { type: 6, name: 'user', description: 'The user to remove the role from', required: true },
+                  { type: 8, name: 'role', description: 'The role to remove', required: true }
+              ],
+          },
+        async execute(interaction) {
+            if (!interaction.guild) return interaction.reply({ content: "❌ This command can only be used in a server.", ephemeral: true });
+
+            if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
+                return interaction.reply({ content: "❌ You don't have permission to use this command.", ephemeral: true });
+            }
+
+            const user = interaction.options.getUser('user');
+            const role = interaction.options.getRole('role');
+            const member = interaction.guild.members.cache.get(user.id);
+
+            if (!member) {
+                return interaction.reply({ content: "❌ Unable to find that member.", ephemeral: true });
+            }
+
+            try {
+                await member.roles.remove(role);
+                await interaction.reply({ content: `✅ Removed role ${role.name} from ${user.tag}` });
+            } catch (error) {
+                console.error("Error removing role:", error);
+                return interaction.reply({ content: "❌ Failed to remove the role.", ephemeral: true });
+            }
+        }
+    }
+};
 
 // Make sure to register commands when bot is ready
 // Check for required environment variables

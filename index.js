@@ -519,7 +519,7 @@ const commands = {
             }
         }
     }
-};
+},
 "addrole": {
    data: {
        name: 'addrole',

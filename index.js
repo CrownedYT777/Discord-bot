@@ -67,7 +67,7 @@ function updateStatus() {
 
 function heartbeat() {
   setInterval(() => {
-    console.log('\x1b[35m[ HEARTBEAT ]\x1b[0m', `Bot is alive at ${new Date().toLocaleTimeString()}`);
+    console.log('\x1b[35m[ HEARTBEAT ]\x1b[0m', `${client.user.tag} is alive at ${new Date().toLocaleTimeString()}`);
   }, 30000);
 }
 

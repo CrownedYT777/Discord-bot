@@ -183,48 +183,59 @@ const commands = {
         }
     },
     "blacklist": {
-        data: {
-            name: 'blacklist',
-            description: 'Add a word to the blacklist',
-            options: [
-                { type: 3, name: 'word', description: 'The word to blacklist', required: true }
-            ],
-        },
-        async execute(interaction) {
-            if (!interaction.guild) return interaction.reply({ content: "❌ This command can only be used in a server.", ephemeral: true });
+    data: {
+        name: 'blacklist',
+        description: 'Add a word to the blacklist',
+        options: [
+            { type: 3, name: 'word', description: 'The word to blacklist', required: true }
+        ],
+    },
+    async execute(interaction) {
+        if (!interaction.guild) return interaction.reply({ content: "❌ This command can only be used in a server.", ephemeral: true });
 
-            if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
-                return interaction.reply({ content: "❌ You don't have permission to use this command.", ephemeral: true });
-            }
+        if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
+            return interaction.reply({ content: "❌ You don't have permission to use this command.", ephemeral: true });
+        }
 
-            const guildId = interaction.guildId;
-            const word = interaction.options.getString('word').toLowerCase();
+        const guildId = interaction.guildId;
+        const word = interaction.options.getString('word').toLowerCase();
 
-            // Initialize guild blacklist if it doesn't exist
-            if (!blacklistData[guildId]) {
-                blacklistData[guildId] = [];
-            }
+        // Initialize guild blacklist if it doesn't exist
+        if (!blacklistData[guildId]) {
+            blacklistData[guildId] = [];
+        }
 
-            // Check if word is already blacklisted
-            if (blacklistData[guildId].includes(word)) {
-                return interaction.reply({ content: `❌ The word "${word}" is already blacklisted.`, ephemeral: true });
-            }
+        // Check if word is already blacklisted
+        if (blacklistData[guildId].includes(word)) {
+            return interaction.reply({ content: `❌ The word "${word}" is already blacklisted.`, ephemeral: true });
+        }
 
-            // Add word to blacklist
-            blacklistData[guildId].push(word);
+        // Add word to blacklist
+        blacklistData[guildId].push(word);
 
-            try {
-                fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(blacklistData, null, 2));
+        try {
+            fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(blacklistData, null, 2));
 
-                // Backup to GitHub
-                backupToGitHub([BLACKLIST_FILE]);
+            // Backup to GitHub
+            await backupToGitHub([BLACKLIST_FILE]);
 
-                await interaction.reply({ content: `✅ Added "${word}" to the blacklist.`, ephemeral: true });
-            } catch (error) {
-                console.error("Error saving blacklist:", error);
-                return interaction.reply({ content: "❌ Failed to update blacklist.", ephemeral: true });
+            await interaction.reply({ content: `✅ Added "${word}" to the blacklist.`, ephemeral: true });
+        } catch (error) {
+            console.error("Error saving blacklist:", error);
+
+            // Check if the interaction is still valid before responding
+            if (interaction.replied || interaction.deferred) {
+                await interaction.followUp({ content: "❌ Failed to update blacklist.", ephemeral: true })
+                    .catch(err => console.error("Failed to send followUp:", err));
+            } else {
+                try {
+                    await interaction.reply({ content: "❌ Failed to update blacklist.", ephemeral: true });
+                } catch (replyError) {
+                    console.error("Failed to reply to interaction:", replyError);
+                }
             }
         }
+    }
     },
     "whitelist": {
         data: {

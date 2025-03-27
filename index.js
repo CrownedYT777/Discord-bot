@@ -193,6 +193,7 @@ const commands = {
     async execute(interaction) {
         if (!interaction.guild) return interaction.reply({ content: "❌ This command can only be used in a server.", ephemeral: true });
 
+        // Acknowledge the interaction immediately to avoid timeout
         await interaction.deferReply({ ephemeral: true });
 
         if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
@@ -219,26 +220,25 @@ const commands = {
             fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(blacklistData, null, 2));
 
             // Backup to GitHub
-            await backupToGitHub([BLACKLIST_FILE]);
+            const backupSuccessful = await backupToGitHub([BLACKLIST_FILE]);
 
-            await interaction.followUp({ content: `✅ Added "${word}" to the blacklist.`, ephemeral: true });
+            if (backupSuccessful) {
+                await interaction.followUp({ content: `✅ Added "${word}" to the blacklist and backed up to GitHub.`, ephemeral: true });
+            } else {
+                await interaction.followUp({ content: `⚠️ Added "${word}" to the blacklist, but failed to back up to GitHub.`, ephemeral: true });
+            }
         } catch (error) {
             console.error("Error saving blacklist:", error);
 
-            // Check if the interaction is still valid before responding
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp({ content: "❌ Failed to update blacklist.", ephemeral: true })
-                    .catch(err => console.error("Failed to send followUp:", err));
+            // Ensure the interaction is appropriately handled
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({ content: "❌ Failed to update blacklist.", ephemeral: true });
             } else {
-                try {
-                    await interaction.reply({ content: "❌ Failed to update blacklist.", ephemeral: true });
-                } catch (replyError) {
-                    console.error("Failed to reply to interaction:", replyError);
-                }
+                await interaction.followUp({ content: "❌ Failed to update blacklist.", ephemeral: true });
             }
         }
     }
-},
+    },
     "whitelist": {
         data: {
             name: 'whitelist',

@@ -193,8 +193,10 @@ const commands = {
     async execute(interaction) {
         if (!interaction.guild) return interaction.reply({ content: "❌ This command can only be used in a server.", ephemeral: true });
 
+        await interaction.deferReply({ ephemeral: true });
+
         if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
-            return interaction.reply({ content: "❌ You don't have permission to use this command.", ephemeral: true });
+            return interaction.followUp({ content: "❌ You don't have permission to use this command.", ephemeral: true });
         }
 
         const guildId = interaction.guildId;
@@ -207,7 +209,7 @@ const commands = {
 
         // Check if word is already blacklisted
         if (blacklistData[guildId].includes(word)) {
-            return interaction.reply({ content: `❌ The word "${word}" is already blacklisted.`, ephemeral: true });
+            return interaction.followUp({ content: `❌ The word "${word}" is already blacklisted.`, ephemeral: true });
         }
 
         // Add word to blacklist
@@ -219,7 +221,7 @@ const commands = {
             // Backup to GitHub
             await backupToGitHub([BLACKLIST_FILE]);
 
-            await interaction.reply({ content: `✅ Added "${word}" to the blacklist.`, ephemeral: true });
+            await interaction.followUp({ content: `✅ Added "${word}" to the blacklist.`, ephemeral: true });
         } catch (error) {
             console.error("Error saving blacklist:", error);
 
@@ -236,7 +238,7 @@ const commands = {
             }
         }
     }
-    },
+},
     "whitelist": {
         data: {
             name: 'whitelist',

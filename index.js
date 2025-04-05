@@ -113,8 +113,12 @@ const client = new Client({
 });
 
 // Status rotation configuration
-const statusMessages = ["🎧 Listening to Spotify", "🎮 Playing GTA VI"];
-const statusTypes = ['dnd', 'idle'];
+const statusMessages = [
+    { type: ActivityType.Listening, message: "Spotify" },
+    { type: ActivityType.Playing, message: "GTA VI" },
+    { type: ActivityType.Watching, message: "https://discord-bot-kn7c.onrender.com" }
+                       ];
+const statusTypes = ['dnd', 'idle', 'online'];
 let currentStatusIndex = 0;
 let currentTypeIndex = 0;
 

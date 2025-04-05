@@ -117,7 +117,7 @@ const statusMessages = [
     { type: ActivityType.Playing, message: "Wuthering Waves" }, // Type 0
     { type: ActivityType.Streaming, message: "on Twitch" }, // Type 1
     { type: ActivityType.Listening, message: "Spotify" }, // Type 2
-    { type: ActivityType.Watching, message: "https://discord-bot-kn7c.onrender.com" }, // Type 3
+    { type: ActivityType.Watching, message: "https://discord-bot-7tpq.onrender.com" }, // Type 3
     { type: ActivityType.Competing, message: "Daily workouts" } // Type 5
 ];
 const statusTypes = ['idle', 'dnd', 'dnd', 'online', 'idle'];
@@ -1107,7 +1107,7 @@ client.on('guildMemberAdd', async (member) => {
         await channel.send(welcomeImageUrl);
         console.log(`✅ Welcome image link sent to ${member.user.username} in ${member.guild.name}`);
     } catch (error) {
-        console.error(`❌ Failed to send welcome image link:`, error);
+        console.error(`❌ Failed to send welcome message:`, error);
     }
 });
 

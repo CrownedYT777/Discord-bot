@@ -126,10 +126,10 @@ function updateStatus() {
   const currentStatus = statusMessages[currentStatusIndex];
   const currentType = statusTypes[currentTypeIndex];
   client.user.setPresence({
-    activities: [{ name: currentStatus, type: ActivityType.Custom }],
+    activities: [{ name: currentStatus.message, type: currentStatus.type }],
     status: currentType,
   });
-  console.log('\x1b[33m[ STATUS ]\x1b[0m', `Updated status to: ${currentStatus} (${currentType})`);
+  console.log('\x1b[33m[ STATUS ]\x1b[0m', `Updated status to: ${currentStatus.type} ${currentStatus.message} (${currentType})`);
   currentStatusIndex = (currentStatusIndex + 1) % statusMessages.length;
   currentTypeIndex = (currentTypeIndex + 1) % statusTypes.length;
 }

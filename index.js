@@ -994,10 +994,10 @@ const commands = {
             }
         }
     },
-    "health": {
+    "uptime": {
         data: {
-            name: 'health',
-            description: 'Show bot health and status information',
+            name: 'uptime',
+            description: 'Show bot uptime and status information',
         },
         async execute(interaction) {
             // Set the authorized user ID here

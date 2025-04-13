@@ -6,7 +6,8 @@ const {
     Routes, 
     REST, 
     PermissionFlagsBits, 
-    Partials
+    Partials, 
+    PermissionsBitField 
 } = require('discord.js');
 const fs = require('fs');
 const express = require('express');

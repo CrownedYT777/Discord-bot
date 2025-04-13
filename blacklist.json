@@ -1,0 +1,17 @@
+
+{
+  "categories": {
+    "profanity": {
+      "enabled": true,
+      "words": []
+    },
+    "spam": {
+      "enabled": true,
+      "words": []
+    },
+    "custom": {
+      "enabled": true,
+      "words": []
+    }
+  }
+}

@@ -4,8 +4,8 @@ const {
     EmbedBuilder, 
     ActivityType, 
     Routes, 
-    REST,
-    PermissionFlagsBits,
+    REST, 
+    PermissionFlagsBits, 
     Partials
 } = require('discord.js');
 const fs = require('fs');

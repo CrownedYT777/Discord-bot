@@ -1277,7 +1277,7 @@ client.on('messageCreate', async message => {
                 .setColor('#FF0000')
                 .setTitle('Message Removed')
                 .setDescription(`Your message was removed because it contained a blacklisted word from the "${category}" category.`)
-                .setFooter({ text: 'ZenithFlare Auto-Moderation' })
+                .setFooter({ text: `${client.user.tag} Auto-Moderation` })
                 .setTimestamp();
 
             // Try to send a DM to the user
@@ -1311,7 +1311,7 @@ client.on('messageCreate', async message => {
                         { name: 'Category', value: category, inline: true },
                         { name: 'Content', value: `||${message.content}||` }
                     )
-                    .setFooter({ text: 'ZenithFlare Auto-Moderation' })
+                    .setFooter({ text: `${client.user.tag} Auto-Moderation` })
                     .setTimestamp();
 
                 await modLogChannel.send({ embeds: [logEmbed] });

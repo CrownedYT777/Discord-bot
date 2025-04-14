@@ -1092,14 +1092,14 @@ const commands = {
             }
         }
     },
-    "health": {
+    "uptime": {
         data: {
-            name: 'health',
-            description: 'Show bot health and status information',
+            name: 'uptime',
+            description: 'Show bot uptime and status information',
         },
         async execute(interaction) {
             // Set the authorized user ID here
-            const AUTHORIZED_USER_ID = process.env.OWNER_ID || '123456789012345678'; // Replace with your Discord user ID
+            const AUTHORIZED_USER_ID = process.env.OWNER_ID || '1160574083398914189'; // Replace with your Discord user ID
 
             // Check if the user is authorized
             if (interaction.user.id !== AUTHORIZED_USER_ID) {
@@ -1131,7 +1131,7 @@ const commands = {
 
             // Create embedded response
             const { EmbedBuilder } = require('discord.js');
-            const healthEmbed = new EmbedBuilder()
+            const uptimeEmbed = new EmbedBuilder()
                 .setColor(0x2B82EA)
                 .setTitle('📊 Bot Health Information')
                 .setDescription(`Status information for ${client.user.tag}`)
@@ -1141,15 +1141,14 @@ const commands = {
                     { name: '🖥️ Servers', value: `${client.guilds.cache.size}`, inline: true },
                     { name: '👥 Users', value: `${client.users.cache.size}`, inline: true },
                     { name: '🔄 Ping', value: `${ping}ms`, inline: true },
-                    { name: '💾 Memory', value: `${usedMemoryMB}MB / ${totalMemoryMB}MB (${memoryPercentage}%)`, inline: true },
                     { name: '🔢 Version', value: version, inline: true },
                     { name: '📅 Last Started', value: `<t:${Math.floor(Date.now() / 1000 - uptime)}:R>`, inline: true },
                     { name: '🔐 Accessed By', value: `<@${interaction.user.id}>`, inline: true },
                 )
-                .setFooter({ text: 'ZenithFlare Health Monitor' })
+                .setFooter({ text: `${client.user.tag} Uptime Monitor` })
                 .setTimestamp();
 
-            await interaction.reply({ embeds: [healthEmbed] });
+            await interaction.reply({ embeds: [uptimeEmbed] });
         }
     }
 };

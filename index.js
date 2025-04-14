@@ -1192,12 +1192,12 @@ const commands = {
     "anti-nuke": {
         data: {
             name: 'anti-nuke',
-            description: 'Configure anti-nuke protection',
+            description: 'Configure nuke protection',
             options: [
                 { 
                     type: 1, 
                     name: 'enable', 
-                    description: 'Enable anti-nuke protection',
+                    description: 'Enable nuke protection',
                     options: [
                         { type: 7, name: 'log_channel', description: 'Channel to log anti-nuke events', required: true }
                     ]
@@ -1205,7 +1205,7 @@ const commands = {
                 { 
                     type: 1, 
                     name: 'disable', 
-                    description: 'Disable anti-nuke protection' 
+                    description: 'Disable nuke protection' 
                 },
                 { 
                     type: 1, 
